@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "OrderCanceledEvent",
+  "namespace": "com.orderix.contracteventlibrary",
+  "fields": [
+    { "name": "sagaId", "type": "string" },
+    { "name": "orderId", "type": "string" },
+    { "name": "customerId", "type": "string" },
+    { "name": "reason", "type": ["null", "string"], "default": null },
+    { "name": "canceledAt", "type": { "type": "long", "logicalType": "timestamp-millis" } }
+  ]
+}

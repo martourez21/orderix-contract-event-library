@@ -1,0 +1,27 @@
+{
+  "type": "record",
+  "name": "BulkItemCreatedEvent",
+  "namespace": "com.orderix.contracteventlibrary",
+  "fields": [
+    {
+      "name": "items",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "ItemCreated",
+          "fields": [
+            {
+              "name": "itemId",
+              "type": "string"
+            },
+            {
+              "name": "initialQuantity",
+              "type": "int"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

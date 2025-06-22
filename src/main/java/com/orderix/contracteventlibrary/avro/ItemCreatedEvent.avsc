@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "ItemCreatedEvent",
+  "namespace": "com.orderix.contracteventlibrary",
+  "fields": [
+    {
+      "name": "itemId",
+      "type": "string"
+    },
+    {
+      "name": "initialQuantity",
+      "type": "int"
+    }
+  ]
+}

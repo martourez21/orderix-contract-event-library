@@ -1,0 +1,10 @@
+{
+  "type": "record",
+  "name": "InventoryReleasedEvent",
+  "namespace": "com.orderix.contracteventlibrary",
+  "fields": [
+    { "name": "sagaId", "type": "string" },
+    { "name": "orderId", "type": "string" },
+    { "name": "releasedAt", "type": { "type": "long", "logicalType": "timestamp-millis" } }
+  ]
+}

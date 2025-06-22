@@ -1,0 +1,10 @@
+{
+  "type": "record",
+  "name": "RegisterInventoryCommand",
+  "namespace": "com.orderix.contracteventlibrary",
+  "fields": [
+    { "name": "commandId", "type": "string" },
+    { "name": "itemId", "type": "string" },
+    { "name": "quantity", "type": "int" }
+  ]
+}

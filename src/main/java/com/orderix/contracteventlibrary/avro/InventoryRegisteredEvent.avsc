@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "InventoryRegisteredEvent",
+  "namespace": "com.orderix.contracteventlibrary",
+  "fields": [
+    { "name": "eventId", "type": "string" },
+    { "name": "itemId", "type": "string" },
+    { "name": "status", "type": { "type": "enum", "name": "InventoryStatus", "symbols": ["SUCCESS", "FAILED"] } },
+    {
+      "name": "message",
+      "type": [ "null", "string" ],
+      "default": null
+    }
+  ]
+}

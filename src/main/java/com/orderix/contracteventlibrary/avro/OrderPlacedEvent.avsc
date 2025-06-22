@@ -1,0 +1,27 @@
+{
+  "type": "record",
+  "name": "OrderPlacedEvent",
+  "namespace": "com.orderix.contracteventlibrary",
+  "fields": [
+    { "name": "orderId", "type": "string" },
+    { "name": "customerId", "type": "string" },
+    {
+      "name": "items",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "OrderItem",
+          "fields": [
+            { "name": "itemId", "type": "string" },
+            { "name": "quantity", "type": "int" },
+            { "name": "unitPrice", "type": "double" },
+            { "name": "subTotal", "type": "double" }
+          ]
+        }
+      }
+    },
+    { "name": "totalPrice", "type": "double" },
+    { "name": "placedAt", "type": { "type": "long", "logicalType": "timestamp-millis" } }
+  ]
+}

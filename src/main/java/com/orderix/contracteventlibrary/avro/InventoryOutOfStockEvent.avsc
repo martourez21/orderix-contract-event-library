@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "InventoryOutOfStockEvent",
+  "namespace": "com.orderix.contracteventlibrary",
+  "fields": [
+    { "name": "sagaId", "type": "string" },
+    { "name": "orderId", "type": "string" },
+    { "name": "itemId", "type": "string" },
+    { "name": "availableQuantity", "type": "int" },
+    { "name": "requestedQuantity", "type": "int" },
+    { "name": "message", "type": ["null", "string"], "default": null },
+    { "name": "timestamp", "type": { "type": "long", "logicalType": "timestamp-millis" } }
+  ]
+}
