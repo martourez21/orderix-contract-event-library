@@ -1,12 +1,6 @@
-# Keep all public APIs
--keep public class com.orderix.** {
-    public *;
-}
-
-# Keep Avro generated classes (if needed)
--keep class org.apache.avro.** { *; }
-
-# Do not warn for missing classes
--dontwarn com.fasterxml.**
--dontwarn org.slf4j.**
--dontwarn org.apache.avro.**
+-injars target/orderix-contract-event-library-0.0.1-SNAPSHOT.jar
+-outjars target/orderix-contract-event-library-0.0.1-SNAPSHOT-obfuscated.jar
+-dontwarn
+-dontoptimize
+-dontobfuscate
+-keep public class com.orderix.** { *; }
