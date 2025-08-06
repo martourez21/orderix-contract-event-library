@@ -2,7 +2,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -22,7 +21,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <avro.version>1.11.3</avro.version>
         <java.version>17</java.version>
-        <proguard.version>7.4.2</proguard.version>
+        <proguard.version>7.4.1</proguard.version>
     </properties>
 
     <repositories>
@@ -47,20 +46,12 @@
             <artifactId>avro</artifactId>
             <version>${avro.version}</version>
         </dependency>
-
-        <!-- ProGuard dependency for downloading -->
-        <dependency>
-            <groupId>com.guardsquare</groupId>
-            <artifactId>proguard-base</artifactId>
-            <version>${proguard.version}</version>
-            <scope>provided</scope>
-        </dependency>
     </dependencies>
 
     <build>
         <plugins>
 
-            <!-- Avro Codegen -->
+            <!-- Avro Schema Generator -->
             <plugin>
                 <groupId>org.apache.avro</groupId>
                 <artifactId>avro-maven-plugin</artifactId>
@@ -68,9 +59,7 @@
                 <executions>
                     <execution>
                         <phase>generate-sources</phase>
-                        <goals>
-                            <goal>schema</goal>
-                        </goals>
+                        <goals><goal>schema</goal></goals>
                         <configuration>
                             <sourceDirectory>${project.basedir}/src/main/java/com/orderix/contracteventlibrary/avro/</sourceDirectory>
                             <outputDirectory>${project.basedir}/src/main/java/</outputDirectory>
@@ -79,7 +68,7 @@
                 </executions>
             </plugin>
 
-            <!-- Compiler -->
+            <!-- Java Compiler -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -90,65 +79,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Download ProGuard dependencies -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-dependency-plugin</artifactId>
-                <version>3.6.1</version>
-                <executions>
-                    <execution>
-                        <id>copy-proguard</id>
-                        <phase>prepare-package</phase>
-                        <goals>
-                            <goal>copy-dependencies</goal>
-                        </goals>
-                        <configuration>
-                            <includeGroupIds>com.guardsquare</includeGroupIds>
-                            <includeArtifactIds>proguard-base</includeArtifactIds>
-                            <outputDirectory>${project.build.directory}/proguard-lib</outputDirectory>
-                            <stripVersion>true</stripVersion>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Create ProGuard configuration file -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <execution>
-                        <id>create-proguard-config</id>
-                        <phase>prepare-package</phase>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
-                        <configuration>
-                            <target>
-                                <mkdir dir="${project.build.directory}/proguard-config"/>
-                                <echo file="${project.build.directory}/proguard-config/proguard.pro">
-                                    -injars ${project.build.directory}/${project.build.finalName}.jar
-                                    -outjars ${project.build.directory}/${project.build.finalName}-obfuscated.jar
-                                    -libraryjars ${java.home}/jmods/java.base.jmod(!**.jar;!module-info.class)
-
-                                    -allowaccessmodification
-                                    -dontoptimize
-                                    -dontpreverify
-                                    -dontshrink
-
-                                    -keep public class com.orderix.** { *; }
-                                    -keepattributes Signature,InnerClasses,EnclosingMethod
-                                    -keepclassmembers class * implements java.io.Serializable { *; }
-                                    -dontwarn
-                                </echo>
-                            </target>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Run ProGuard using exec plugin -->
+            <!-- Exec Plugin to run ProGuard from unpacked distribution -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
@@ -157,37 +88,33 @@
                     <execution>
                         <id>run-proguard</id>
                         <phase>package</phase>
-                        <goals>
-                            <goal>exec</goal>
-                        </goals>
+                        <goals><goal>exec</goal></goals>
                         <configuration>
                             <executable>java</executable>
                             <arguments>
                                 <argument>-cp</argument>
-                                <argument>${project.build.directory}/proguard-lib/proguard-base.jar</argument>
+                                <argument>${project.basedir}/proguard-dist/proguard-${proguard.version}/lib/proguard.jar</argument>
                                 <argument>proguard.ProGuard</argument>
-                                <argument>@${project.build.directory}/proguard-config/proguard.pro</argument>
+                                <argument>@${project.basedir}/proguard-rules.pro</argument>
                             </arguments>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
 
-            <!-- Javadoc -->
+            <!-- Javadoc Plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.3.1</version>
                 <executions>
                     <execution>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
+                        <goals><goal>jar</goal></goals>
                     </execution>
                 </executions>
             </plugin>
 
-            <!-- Deploy Plugin -->
+            <!-- Deploy Plugin to deploy obfuscated jar -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-deploy-plugin</artifactId>
