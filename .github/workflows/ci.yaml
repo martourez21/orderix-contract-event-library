@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -28,38 +28,135 @@ jobs:
       - name: Configure Maven settings
         run: |
           mkdir -p ~/.m2
-          echo "<settings>
-                  <servers>
-                    <server>
-                      <id>github</id>
-                      <username>${{ github.actor }}</username>
-                      <password>${{ secrets.GITHUB_TOKEN }}</password>
-                    </server>
-                  </servers>
-                </settings>" > ~/.m2/settings.xml
+          cat <<EOF > ~/.m2/settings.xml
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.GITHUB_TOKEN }}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>guardsquare</id>
+                <repositories>
+                  <repository>
+                    <id>guardsquare</id>
+                    <url>https://maven.guardsquare.com</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>guardsquare</activeProfile>
+            </activeProfiles>
+          </settings>
+          EOF
 
-      - name: Download and unpack ProGuard
+      - name: Build JAR (without obfuscation)
+        run: mvn clean compile package -DskipTests -Dexec.skip=true
+
+      - name: Upload regular JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: regular-jar-${{ github.sha }}
+          path: target/*.jar
+
+  obfuscate:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install Maven
+        run: sudo apt-get update && sudo apt-get install -y maven
+
+      - name: Configure Maven settings
         run: |
-          curl -L -o proguard-dist.zip https://github.com/Guardsquare/proguard/releases/download/v7.4.1/proguard-7.4.1.zip
-          unzip -q proguard-dist.zip -d proguard-dist
+          mkdir -p ~/.m2
+          cat <<EOF > ~/.m2/settings.xml
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.GITHUB_TOKEN }}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>guardsquare</id>
+                <repositories>
+                  <repository>
+                    <id>guardsquare</id>
+                    <url>https://maven.guardsquare.com</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>guardsquare</activeProfile>
+            </activeProfiles>
+          </settings>
+          EOF
 
-      - name: Build and obfuscate (run ProGuard)
-        run: mvn clean package -DskipTests
+      - name: Download regular JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: regular-jar-${{ github.sha }}
+          path: target/
+
+      - name: Prepare ProGuard and run obfuscation
+        run: |
+          # Download ProGuard from GitHub releases
+          curl -L -o proguard.zip "https://github.com/Guardsquare/proguard/releases/download/v7.4.2/proguard-7.4.2.zip"
+          unzip proguard.zip
+          
+          # Create ProGuard config
+          mkdir -p target/proguard-config
+          cat <<EOF > target/proguard-config/proguard.pro
+          -injars target/orderix-contract-event-library-0.0.1-SNAPSHOT.jar
+          -outjars target/orderix-contract-event-library-0.0.1-SNAPSHOT-obfuscated.jar
+          -libraryjars ${JAVA_HOME}/jmods/java.base.jmod(!**.jar;!module-info.class)
+          
+          -allowaccessmodification
+          -dontoptimize
+          -dontpreverify
+          -dontshrink
+          
+          -keep public class com.orderix.** { *; }
+          -keepattributes Signature,InnerClasses,EnclosingMethod
+          -keepclassmembers class * implements java.io.Serializable { *; }
+          -dontwarn
+          EOF
+          
+          # Run ProGuard using the downloaded distribution
+          java -jar proguard-7.4.2/lib/proguard.jar @target/proguard-config/proguard.pro
 
       - name: Upload obfuscated JAR
         uses: actions/upload-artifact@v4
         with:
-          name: obfuscated-jar
+          name: obfuscated-jar-${{ github.sha }}
           path: target/*-obfuscated.jar
 
   generate-docs:
     runs-on: ubuntu-latest
     needs: build
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -69,7 +166,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y maven
 
       - name: Generate sources from Avro schema
-        run: mvn clean install -DskipTests
+        run: mvn compile -DskipTests -Dexec.skip=true
 
       - name: Generate Javadocs
         run: mvn javadoc:javadoc
@@ -83,8 +180,10 @@ jobs:
   deploy-docs:
     runs-on: ubuntu-latest
     needs: generate-docs
+
     permissions:
       contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -94,15 +193,11 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      - name: Setup gh-pages branch
+      - name: Prepare branch
         run: |
-          if git ls-remote --exit-code --heads origin gh-pages; then
-            git checkout --orphan temp-gh-pages
-            git rm -rf .
-          else
-            git checkout --orphan gh-pages
-            git rm -rf .
-          fi
+          git fetch origin gh-pages || true
+          git checkout --orphan gh-pages
+          git rm -rf . || true
 
       - name: Download Javadocs
         uses: actions/download-artifact@v4
@@ -110,26 +205,24 @@ jobs:
           name: javadocs
           path: .
 
-      - name: Commit and push to gh-pages
+      - name: Commit and push Javadocs
         run: |
           git add .
           git commit -m "Deploy Javadocs for ${{ github.sha }}" || echo "No changes to commit"
-          if git ls-remote --exit-code --heads origin gh-pages; then
-            git push --force origin HEAD:gh-pages
-          else
-            git push origin HEAD:gh-pages
-          fi
+          git push --force origin HEAD:gh-pages
 
   deploy-package:
     runs-on: ubuntu-latest
-    needs: build
+    needs: obfuscate
+
     permissions:
       packages: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           java-version: '17'
@@ -141,20 +234,51 @@ jobs:
       - name: Configure Maven settings
         run: |
           mkdir -p ~/.m2
-          echo "<settings>
-                  <servers>
-                    <server>
-                      <id>github</id>
-                      <username>${{ github.actor }}</username>
-                      <password>${{ secrets.GITHUB_TOKEN }}</password>
-                    </server>
-                  </servers>
-                </settings>" > ~/.m2/settings.xml
+          cat <<EOF > ~/.m2/settings.xml
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.GITHUB_TOKEN }}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>guardsquare</id>
+                <repositories>
+                  <repository>
+                    <id>guardsquare</id>
+                    <url>https://maven.guardsquare.com</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>guardsquare</activeProfile>
+            </activeProfiles>
+          </settings>
+          EOF
 
-      - name: Clear local Maven repository
+      - name: Download obfuscated JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: obfuscated-jar-${{ github.sha }}
+          path: target/
+
+      - name: Clear local Maven repo (optional)
         run: rm -rf ~/.m2/repository/com/orderix/
 
-      - name: Deploy obfuscated JAR to GitHub Packages
-        run: mvn deploy -DskipTests
+      - name: Deploy to GitHub Packages
+        run: |
+          # Deploy the obfuscated JAR directly
+          mvn deploy:deploy-file \
+            -DgroupId=com.orderix \
+            -DartifactId=orderix-contract-event-library \
+            -Dversion=0.0.1-SNAPSHOT \
+            -Dpackaging=jar \
+            -Dfile=target/orderix-contract-event-library-0.0.1-SNAPSHOT-obfuscated.jar \
+            -DrepositoryId=github \
+            -Durl=https://maven.pkg.github.com/martourez21/orderix-contract-event-library
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
