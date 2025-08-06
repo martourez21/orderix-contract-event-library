@@ -22,6 +22,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <avro.version>1.11.3</avro.version>
         <java.version>17</java.version>
+        <proguard.version>7.4.2</proguard.version>
     </properties>
 
     <repositories>
@@ -45,6 +46,14 @@
             <groupId>org.apache.avro</groupId>
             <artifactId>avro</artifactId>
             <version>${avro.version}</version>
+        </dependency>
+
+        <!-- ProGuard dependency for downloading -->
+        <dependency>
+            <groupId>com.guardsquare</groupId>
+            <artifactId>proguard-base</artifactId>
+            <version>${proguard.version}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
@@ -81,7 +90,65 @@
                 </configuration>
             </plugin>
 
-            <!-- Exec plugin to run ProGuard CLI -->
+            <!-- Download ProGuard dependencies -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-proguard</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeGroupIds>com.guardsquare</includeGroupIds>
+                            <includeArtifactIds>proguard-base</includeArtifactIds>
+                            <outputDirectory>${project.build.directory}/proguard-lib</outputDirectory>
+                            <stripVersion>true</stripVersion>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Create ProGuard configuration file -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>create-proguard-config</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.build.directory}/proguard-config"/>
+                                <echo file="${project.build.directory}/proguard-config/proguard.pro">
+                                    -injars ${project.build.directory}/${project.build.finalName}.jar
+                                    -outjars ${project.build.directory}/${project.build.finalName}-obfuscated.jar
+                                    -libraryjars ${java.home}/jmods/java.base.jmod(!**.jar;!module-info.class)
+
+                                    -allowaccessmodification
+                                    -dontoptimize
+                                    -dontpreverify
+                                    -dontshrink
+
+                                    -keep public class com.orderix.** { *; }
+                                    -keepattributes Signature,InnerClasses,EnclosingMethod
+                                    -keepclassmembers class * implements java.io.Serializable { *; }
+                                    -dontwarn
+                                </echo>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Run ProGuard using exec plugin -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
@@ -96,9 +163,10 @@
                         <configuration>
                             <executable>java</executable>
                             <arguments>
-                                <argument>-jar</argument>
-                                <argument>${project.basedir}/proguard/proguard.jar</argument>
-                                <argument>@${project.basedir}/proguard/proguard.pro</argument>
+                                <argument>-cp</argument>
+                                <argument>${project.build.directory}/proguard-lib/proguard-base.jar</argument>
+                                <argument>proguard.ProGuard</argument>
+                                <argument>@${project.build.directory}/proguard-config/proguard.pro</argument>
                             </arguments>
                         </configuration>
                     </execution>

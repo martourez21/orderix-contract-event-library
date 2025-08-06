@@ -54,6 +54,11 @@ jobs:
           </settings>
           EOF
 
+      - name: Download ProGuard JAR (if using exec approach)
+        run: |
+          mkdir -p proguard
+          curl -L -o proguard/proguard.jar "https://github.com/Guardsquare/proguard/releases/download/v7.4.2/proguard-7.4.2.jar"
+
       - name: Build and Obfuscate JAR
         run: mvn clean package -DskipTests
 
