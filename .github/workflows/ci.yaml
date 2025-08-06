@@ -121,12 +121,24 @@ jobs:
           curl -L -o proguard.zip "https://github.com/Guardsquare/proguard/releases/download/v7.4.2/proguard-7.4.2.zip"
           unzip proguard.zip
           
-          # Create ProGuard config
+          # Get absolute paths
+          INPUT_JAR=$(realpath target/orderix-contract-event-library-0.0.1-SNAPSHOT.jar)
+          OUTPUT_JAR=$(realpath target/orderix-contract-event-library-0.0.1-SNAPSHOT-obfuscated.jar)
+          JAVA_HOME_PATH=$(realpath $JAVA_HOME)
+          
+          # Verify input JAR exists
+          if [ ! -f "$INPUT_JAR" ]; then
+            echo "Input JAR not found: $INPUT_JAR"
+            ls -la target/
+            exit 1
+          fi
+          
+          # Create ProGuard config with absolute paths
           mkdir -p target/proguard-config
           cat <<EOF > target/proguard-config/proguard.pro
-          -injars target/orderix-contract-event-library-0.0.1-SNAPSHOT.jar
-          -outjars target/orderix-contract-event-library-0.0.1-SNAPSHOT-obfuscated.jar
-          -libraryjars ${JAVA_HOME}/jmods/java.base.jmod(!**.jar;!module-info.class)
+          -injars $INPUT_JAR
+          -outjars $OUTPUT_JAR
+          -libraryjars $JAVA_HOME_PATH/jmods/java.base.jmod(!**.jar;!module-info.class)
           
           -allowaccessmodification
           -dontoptimize
@@ -138,6 +150,9 @@ jobs:
           -keepclassmembers class * implements java.io.Serializable { *; }
           -dontwarn
           EOF
+          
+          echo "ProGuard configuration:"
+          cat target/proguard-config/proguard.pro
           
           # Run ProGuard using the downloaded distribution
           java -jar proguard-7.4.2/lib/proguard.jar @target/proguard-config/proguard.pro
