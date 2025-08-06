@@ -38,14 +38,14 @@ jobs:
                   </servers>
                 </settings>" > ~/.m2/settings.xml
 
-      - name: Build with Maven (skip tests)
-        run: mvn -B clean package -DskipTests -Dmaven.test.skip=true --file pom.xml
+      - name: Build and Obfuscate with ProGuard
+        run: mvn clean package proguard:proguard -DskipTests
 
-      - name: Upload build artifacts
+      - name: Upload obfuscated JAR
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
-          path: target/*.jar
+          name: obfuscated-jar
+          path: target/*-obfuscated.jar
 
   generate-docs:
     runs-on: ubuntu-latest
@@ -94,13 +94,10 @@ jobs:
 
       - name: Setup gh-pages branch
         run: |
-          # Check if the gh-pages branch exists
           if git ls-remote --exit-code --heads origin gh-pages; then
-            # If the branch exists, create a new orphan branch temporarily
             git checkout --orphan temp-gh-pages
             git rm -rf .
           else
-            # If the branch does not exist, create it as an orphan branch
             git checkout --orphan gh-pages
             git rm -rf .
           fi
@@ -115,7 +112,6 @@ jobs:
         run: |
           git add .
           git commit -m "Deploy Javadocs for ${{ github.sha }}" || echo "No changes to commit"
-
           if git ls-remote --exit-code --heads origin gh-pages; then
             git push --force origin HEAD:gh-pages
           else
@@ -142,10 +138,23 @@ jobs:
       - name: Install Maven
         run: sudo apt-get update && sudo apt-get install -y maven
 
-      - name: Clear local Maven repository
-        run: rm -rf ~/.m2/repository/com/railstream/
+      - name: Configure Maven settings
+        run: |
+          mkdir -p ~/.m2
+          echo "<settings>
+                  <servers>
+                    <server>
+                      <id>github</id>
+                      <username>${{ github.actor }}</username>
+                      <password>${{ secrets.GITHUB_TOKEN }}</password>
+                    </server>
+                  </servers>
+                </settings>" > ~/.m2/settings.xml
 
-      - name: Publish to GitHub Packages
-        run: mvn deploy
+      - name: Clear local Maven repository
+        run: rm -rf ~/.m2/repository/com/orderix/
+
+      - name: Deploy obfuscated JAR to GitHub Packages
+        run: mvn deploy -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

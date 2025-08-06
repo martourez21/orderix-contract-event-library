@@ -76,6 +76,33 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>com.github.wvengen</groupId>
+                <artifactId>proguard-maven-plugin</artifactId>
+                <version>2.4.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>proguard</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <proguardInclude>${project.basedir}/proguard-rules.pro</proguardInclude>
+                    <obfuscate>true</obfuscate>
+                    <shrink>true</shrink>
+                    <optimize>true</optimize>
+                    <attach>true</attach> <!-- Attach obfuscated jar to build -->
+                    <injars>
+                        <injar>${project.build.directory}/${project.build.finalName}.jar</injar>
+                    </injars>
+                    <outjars>
+                        <outjar>${project.build.directory}/${project.build.finalName}-obfuscated.jar</outjar>
+                    </outjars>
+                </configuration>
+            </plugin>
+
         </plugins>
     </build>
 
